@@ -1,0 +1,2 @@
+[backendprod]
+BACKEND01 ansible_port=22 ansible_host=10.0.255.61

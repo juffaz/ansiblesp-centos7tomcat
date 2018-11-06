@@ -1,0 +1,58 @@
+---
+- hosts: backendprod 
+  tasks:
+    - name: Make sure that we can connect to the machine
+      ping:
+
+    - name: add group "tomcat"
+      group: name=tomcat
+
+    - name: add user "tomcat"
+      user: name=tomcat group=tomcat createhome=yes home=/export/home/tomcat
+      become: true
+
+    - name: copy Tomcat 
+      copy: src=files/apache-tomcat-8.5.14.tar.gz dest=/export/home/tomcat/apache-tomcat-8.5.14.tar.gz
+
+    - name: copy Start script 
+      copy: src=files/start.sh dest=/export/home/tomcat/start.sh mode=+x
+
+    - name: copy Stop script 
+      copy: src=files/stop.sh dest=/export/home/tomcat/stop.sh mode=+x
+
+    - name: copy Log script 
+      copy: src=files/log.sh dest=/export/home/tomcat/log.sh mode=+x
+
+    - name: Extract Tomcat archive
+      command: tar zxvf /export/home/tomcat/apache-tomcat-8.5.14.tar.gz -C /export/home/tomcat/ creates=/export/home/tomcat/apache-tomcat-8.5.14
+
+    - name: Copy JDK rpm file to server
+      copy: src=files/jdk-8u144-linux-x64.rpm dest=/export/home/tomcat/jdk-8u144-linux-x64.rpm
+
+    - name: Install JDK package.
+      yum: name=/export/home/tomcat/jdk-8u144-linux-x64.rpm state=present
+
+    - name: Configure Tomcat users
+      copy: src=files/tomcat-users.xml dest=/export/home/tomcat/apache-tomcat-8.5.14/conf/
+
+    - name: install Tomcat8 systemd unit file
+      copy: src=files/tomcat8.service dest=/etc/systemd/system/tomcat8.service
+
+    - name: Change ownership of Tomcat installation
+      file: path=/export/home/tomcat owner=tomcat group=tomcat  recurse=yes
+
+    - name: start Tomcat8 service
+      systemd: state=restarted enabled=yes name=tomcat8 daemon_reload=yes
+
+    - name: make sure daemon is reloaded (ansible bug)
+      shell: systemctl daemon-reload
+
+    - name: insert firewalld rule for tomcat http port
+      firewalld: port={{ 8080 }}/tcp permanent=true state=enabled immediate=yes
+      when: "ansible_os_family == 'RedHat' and ansible_distribution_major_version == '7'"
+
+    - name: insert firewalld rule for tomcat https port
+      firewalld: port={{ 8443 }}/tcp permanent=true state=enabled immediate=yes
+      when: "ansible_os_family == 'RedHat' and ansible_distribution_major_version == '7'"
+
+
